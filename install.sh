@@ -90,6 +90,7 @@ K8S_MCP_SERVER_IMAGE="${K8S_MCP_SERVER_IMAGE:-}"
 CAUSA_BACKEND_IMAGE="${CAUSA_BACKEND_IMAGE:-}"
 JAFRA_MCP_IMAGE="${JAFRA_MCP_IMAGE:-}"
 QUARKUS_MCP_IMAGE="${QUARKUS_MCP_IMAGE:-}"
+PROMETHEUS_MCP_SERVER_IMAGE="${PROMETHEUS_MCP_SERVER_IMAGE:-}"
 CAUSA_MCP_IMAGE="${CAUSA_MCP_IMAGE:-}"
 JAFRA_CONTROLLER_IMAGE="${JAFRA_CONTROLLER_IMAGE:-}"
 JAFRA_ANALYZER_IMAGE="${JAFRA_ANALYZER_IMAGE:-}"
@@ -97,7 +98,7 @@ JAFRA_AGENT_IMAGE="${JAFRA_AGENT_IMAGE:-}"
 POSTGRES_KIND_IMAGE="${POSTGRES_KIND_IMAGE:-}"
 POSTGRES_OCP_IMAGE="${POSTGRES_OCP_IMAGE:-}"
 export K8S_MCP_SERVER_IMAGE CAUSA_BACKEND_IMAGE
-export JAFRA_MCP_IMAGE QUARKUS_MCP_IMAGE CAUSA_MCP_IMAGE
+export JAFRA_MCP_IMAGE QUARKUS_MCP_IMAGE PROMETHEUS_MCP_SERVER_IMAGE CAUSA_MCP_IMAGE
 export JAFRA_CONTROLLER_IMAGE JAFRA_ANALYZER_IMAGE JAFRA_AGENT_IMAGE
 export POSTGRES_KIND_IMAGE POSTGRES_OCP_IMAGE
 
@@ -106,6 +107,7 @@ K8S_MCP_SERVER_IMAGE_OVERRIDDEN=false
 CAUSA_BACKEND_IMAGE_OVERRIDDEN=false
 JAFRA_MCP_IMAGE_OVERRIDDEN=false
 QUARKUS_MCP_IMAGE_OVERRIDDEN=false
+PROMETHEUS_MCP_SERVER_IMAGE_OVERRIDDEN=false
 CAUSA_MCP_IMAGE_OVERRIDDEN=false
 JAFRA_CONTROLLER_IMAGE_OVERRIDDEN=false
 JAFRA_ANALYZER_IMAGE_OVERRIDDEN=false
@@ -113,7 +115,7 @@ JAFRA_AGENT_IMAGE_OVERRIDDEN=false
 POSTGRES_KIND_IMAGE_OVERRIDDEN=false
 POSTGRES_OCP_IMAGE_OVERRIDDEN=false
 export K8S_MCP_SERVER_IMAGE_OVERRIDDEN CAUSA_BACKEND_IMAGE_OVERRIDDEN
-export JAFRA_MCP_IMAGE_OVERRIDDEN QUARKUS_MCP_IMAGE_OVERRIDDEN CAUSA_MCP_IMAGE_OVERRIDDEN
+export JAFRA_MCP_IMAGE_OVERRIDDEN QUARKUS_MCP_IMAGE_OVERRIDDEN PROMETHEUS_MCP_SERVER_IMAGE_OVERRIDDEN CAUSA_MCP_IMAGE_OVERRIDDEN
 export JAFRA_CONTROLLER_IMAGE_OVERRIDDEN JAFRA_ANALYZER_IMAGE_OVERRIDDEN JAFRA_AGENT_IMAGE_OVERRIDDEN
 export POSTGRES_KIND_IMAGE_OVERRIDDEN POSTGRES_OCP_IMAGE_OVERRIDDEN
 
@@ -131,6 +133,7 @@ source "${SCRIPT_DIR}/lib/install_k8s_mcp.sh"
 source "${SCRIPT_DIR}/lib/install_jafra.sh"
 source "${SCRIPT_DIR}/lib/install_jafra_mcp.sh"
 source "${SCRIPT_DIR}/lib/install_quarkus_mcp.sh"
+source "${SCRIPT_DIR}/lib/install_prometheus_mcp.sh"
 source "${SCRIPT_DIR}/lib/install_postgres.sh"
 source "${SCRIPT_DIR}/lib/install_causa.sh"
 source "${SCRIPT_DIR}/lib/install_causa_mcp.sh"
@@ -409,8 +412,18 @@ main() {
         log_install_success "Quarkus MCP Server"
         installed_components+=("Quarkus MCP Server")
     fi
+    # ── Step 8: Prometheus MCP Server ────────────────────────────────────────
+    start_spinner "Installing Prometheus MCP Server..."
+    if ! install_prometheus_mcp_server; then
+        stop_spinner
+        log_warn "Prometheus MCP Server installation skipped or failed"
+    else
+        stop_spinner
+        log_install_success "Prometheus MCP Server"
+        installed_components+=("Prometheus MCP Server")
+    fi
 
-    # ── Steps 8-10: PostgreSQL + Causa Backend + Causa MCP ───────────────────
+    # ── Steps 9-10: PostgreSQL + Causa Backend + Causa MCP ───────────────────
     # On kind these run via _install_kind_only_components (standalone PG Deployment).
     # On OpenShift they run directly (CNPG operator + OCP Route variants).
     if _is_kind_target; then
@@ -504,6 +517,14 @@ uninstall_main() {
             write_to_log_file "WARN" "Kind context '${kind_ctx}' not found — kubectl may target the wrong cluster"
         fi
     fi
+
+    start_spinner "Uninstalling Prometheus MCP Server..."
+    uninstall_prometheus_mcp_server
+    stop_spinner; log_uninstall_success "Prometheus MCP Server"
+
+    start_spinner "Uninstalling Causa MCP Server..."
+    uninstall_causa_mcp
+    stop_spinner; log_uninstall_success "Causa MCP Server"
 
     start_spinner "Uninstalling Quarkus MCP Server..."
     uninstall_quarkus_mcp
@@ -634,6 +655,7 @@ show_usage() {
     echo "    --jafra-mcp-image IMAGE                    Override Jafra MCP Server image"
     echo "    --causa-backend-image IMAGE                Override Causa Backend image"
     echo "    --quarkus-mcp-image IMAGE                  Override Quarkus MCP Server image"
+    echo "    --prometheus-mcp-server-image IMAGE        Override Prometheus MCP Server image"
     echo "    --causa-mcp-image IMAGE                    Override Causa MCP Server image"
     echo "    --jafra-controller-image IMAGE             Override Jafra Controller image"
     echo "    --jafra-analyzer-image IMAGE               Override Jafra Analyzer image"
@@ -715,6 +737,9 @@ parse_arguments() {
             --quarkus-mcp-image)
                 [[ -z "${2:-}" ]] && { log_error "Value required for --quarkus-mcp-image"; show_usage; exit 2; }
                 QUARKUS_MCP_IMAGE="$2"; QUARKUS_MCP_IMAGE_OVERRIDDEN=true; shift 2 ;;
+            --prometheus-mcp-server-image)
+                [[ -z "${2:-}" ]] && { log_error "Value required for --prometheus-mcp-server-image"; show_usage; exit 2; }
+                PROMETHEUS_MCP_SERVER_IMAGE="$2"; PROMETHEUS_MCP_SERVER_IMAGE_OVERRIDDEN=true; shift 2 ;;
             --causa-mcp-image)
                 [[ -z "${2:-}" ]] && { log_error "Value required for --causa-mcp-image"; show_usage; exit 2; }
                 CAUSA_MCP_IMAGE="$2"; CAUSA_MCP_IMAGE_OVERRIDDEN=true; shift 2 ;;

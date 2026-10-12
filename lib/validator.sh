@@ -140,13 +140,16 @@ validate_docker_running() {
         local rootful
         rootful=$(podman machine inspect --format '{{.Rootful}}' 2>/dev/null || echo "")
         if [[ "${rootful}" == "false" ]]; then
-            log_error "Podman machine is running in rootless mode — Kind requires rootful mode."
-            log_error "Recreate the Podman machine as rootful:"
-            log_error "  podman machine stop"
-            log_error "  podman machine rm"
-            log_error "  podman machine init --rootful --cpus 4 --memory 4096"
-            log_error "  podman machine start"
-            return 1
+            write_to_log_file "INFO" "Podman machine is running in rootless mode."
+        elif [[ "${rootful}" == "true" ]]; then
+            write_to_log_file "INFO" "Podman machine is running in rootful mode."
+        else
+            # Native Linux Podman check
+            local is_rootless
+            is_rootless=$(podman info --format '{{.Host.Security.Rootless}}' 2>/dev/null || echo "")
+            if [[ "${is_rootless}" == "true" ]]; then
+                write_to_log_file "INFO" "Podman host is running in rootless mode."
+            fi
         fi
     fi
 
@@ -296,6 +299,7 @@ validate_image_overrides() {
     _vi "${JAFRA_MCP_IMAGE}"               "--jafra-mcp-image"            "${JAFRA_MCP_IMAGE_OVERRIDDEN:-false}"
     _vi "${CAUSA_BACKEND_IMAGE}"           "--causa-backend-image"        "${CAUSA_BACKEND_IMAGE_OVERRIDDEN:-false}"
     _vi "${QUARKUS_MCP_IMAGE}"             "--quarkus-mcp-image"          "${QUARKUS_MCP_IMAGE_OVERRIDDEN:-false}"
+    _vi "${PROMETHEUS_MCP_SERVER_IMAGE}"   "--prometheus-mcp-server-image" "${PROMETHEUS_MCP_SERVER_IMAGE_OVERRIDDEN:-false}"
     _vi "${CAUSA_MCP_IMAGE}"               "--causa-mcp-image"            "${CAUSA_MCP_IMAGE_OVERRIDDEN:-false}"
     _vi "${JAFRA_CONTROLLER_IMAGE}"        "--jafra-controller-image"     "${JAFRA_CONTROLLER_IMAGE_OVERRIDDEN:-false}"
     _vi "${JAFRA_ANALYZER_IMAGE}"          "--jafra-analyzer-image"       "${JAFRA_ANALYZER_IMAGE_OVERRIDDEN:-false}"
@@ -368,7 +372,7 @@ post_component_validation() {
         fi
     }
 
-    local k8s_mcp_status jafra_mcp_status quarkus_status postgres_status causa_status causa_mcp_status
+    local k8s_mcp_status jafra_mcp_status quarkus_status prom_mcp_status postgres_status causa_status causa_mcp_status
 
     _check_deployment "Kubernetes MCP Server"  "kubernetes-mcp-server"  k8s_mcp_status
     _check_deployment "Jafra MCP Server"       "jafra-mcp"              jafra_mcp_status
@@ -378,6 +382,7 @@ post_component_validation() {
     else
         _check_deployment "PostgreSQL"         "postgres"               postgres_status
     fi
+    _check_deployment "Prometheus MCP Server"  "prometheus-mcp-server"  prom_mcp_status
     _check_deployment "Causa Backend"          "causa-backend"          causa_status
     _check_deployment "Causa MCP Server"       "causa-mcp"              causa_mcp_status
 
@@ -388,6 +393,7 @@ post_component_validation() {
         echo -e "${k8s_mcp_status}"
         echo -e "${jafra_mcp_status}"
         echo -e "${quarkus_status}"
+        echo -e "${prom_mcp_status}"
         echo -e "${postgres_status}"
         echo -e "${causa_status}"
         echo -e "${causa_mcp_status}"
