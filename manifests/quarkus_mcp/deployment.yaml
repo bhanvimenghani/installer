@@ -39,7 +39,7 @@ spec:
     spec:
       containers:
         - name: mcp-metrics
-          image: quay.io/causa-ai-hub/quarkus-mcp:0.0.2
+          image: quay.io/causa-ai-hub/quarkus-mcp:0.0.1
           ports:
             - containerPort: 8080
               name: http
